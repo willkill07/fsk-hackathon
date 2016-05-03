@@ -7,24 +7,10 @@
 #include <vector>
 
 #include <cmath>
+
 #include <openacc.h>
 
-#define FV_SIZE 54
-
-struct Subtree {
-  float fv[FV_SIZE];
-};
-
-std::vector <Subtree> subtrees;
-std::vector <int> offsets;
-std::vector <int> sizes;
-std::vector <float> sim;
-
-void loadData (const std::string &);
-void computeSimilarity (const Subtree * restrict, const int,
-                        const int * restrict, const int * restrict, const int,
-												float * restrict, const int, const float);
-float simFunc (const Subtree * restrict, const Subtree * restrict);
+#include "params.h"
 
 int main (int argc, char* argv[]) {
 
@@ -63,7 +49,7 @@ void loadData (const std::string & fileName) {
     offsets.push_back (cumulativeIndex);
     cumulativeIndex += currentIndex;
     sizes.push_back (currentIndex);
-		if (sizes.size() >= 1000)
+		if (sizes.size() >= LIMIT)
 			break;
   }
 }
@@ -81,10 +67,11 @@ void computeSimilarity (const Subtree * restrict data, const int subtreeCount,
                         const int * restrict offsets, const int * restrict sizes, const int binaryCount,
                         float * restrict sim, const int simCount, const float delta) {
 
-  #pragma acc parallel loop collapse(2) copyin (data[0:subtreeCount], offsets[0:binaryCount], sizes[0:binaryCount]), copyout (sim[0:simCount]) gang vector
+  #pragma acc parallel loop collapse(2) copyin (data[0:subtreeCount], offsets[0:binaryCount], sizes[0:binaryCount]), copyout (sim[0:simCount]) gang
 	for (int i1 = 0; i1 < binaryCount; ++i1) {
 		for (int i2 = 0; i2 < binaryCount; ++i2) {
 			float globalSim = 0.0f;
+      #pragma acc loop collapse(2) vector
 			for (int j1 = 0; j1 < sizes[i1]; ++j1) {
 				for (int j2 = 0; j2 < sizes[i2]; ++j2) {
 					const Subtree* s1 = data + offsets [i1] + j1;

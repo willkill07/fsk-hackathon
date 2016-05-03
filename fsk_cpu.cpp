@@ -6,25 +6,11 @@
 #include <string>
 #include <vector>
 
+#include <chrono>
+
 #include <cmath>
-#include <openacc.h>
 
-#define FV_SIZE 54
-
-struct Subtree {
-  float fv[FV_SIZE];
-};
-
-std::vector <Subtree> subtrees;
-std::vector <int> offsets;
-std::vector <int> sizes;
-std::vector <float> sim;
-
-void loadData (const std::string &);
-void computeSimilarity (const Subtree * restrict, const int,
-                        const int * restrict, const int * restrict, const int,
-												float * restrict, const int, const float);
-float simFunc (const Subtree * restrict, const Subtree * restrict);
+#include "params.h"
 
 int main (int argc, char* argv[]) {
 
@@ -33,7 +19,11 @@ int main (int argc, char* argv[]) {
   loadData (argv[1]);
   sim.resize (sizes.size() * sizes.size());
 	std::cerr << "Compute Kernel " << std::endl;
+
+	auto begin = std::chrono::high_resolution_clock::now();
   computeSimilarity(subtrees.data(), subtrees.size(), offsets.data(), sizes.data(), offsets.size(), sim.data(), sim.size(), DELTA);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::cout << "TIME: " << std::chrono::duration_cast<std::chrono::seconds> (end - begin).count() << std::endl;
 	std::cout << sim[0] << std::endl;
 	#ifdef OUTPUT
   std::ofstream ofs (argv[2]);
@@ -63,7 +53,7 @@ void loadData (const std::string & fileName) {
     offsets.push_back (cumulativeIndex);
     cumulativeIndex += currentIndex;
     sizes.push_back (currentIndex);
-		if (sizes.size() >= 1000)
+		if (sizes.size() >= LIMIT)
 			break;
   }
 }
