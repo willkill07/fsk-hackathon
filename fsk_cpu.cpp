@@ -68,7 +68,6 @@ void loadData (const std::string & fileName) {
   }
 }
 
-#pragma acc routine seq
 float simFunc (const Subtree * restrict s1, const Subtree * restrict s2) {
   float normdiff = 0.0f;
   for (int k = 0; k < FV_SIZE; ++k) {
@@ -81,7 +80,7 @@ void computeSimilarity (const Subtree * restrict data, const int subtreeCount,
                         const int * restrict offsets, const int * restrict sizes, const int binaryCount,
                         float * restrict sim, const int simCount, const float delta) {
 
-  #pragma acc parallel loop collapse(2) copyin (data[0:subtreeCount], offsets[0:binaryCount], sizes[0:binaryCount]), copyout (sim[0:simCount]) gang vector
+  #pragma omp parallel for collapse(2)
 	for (int i1 = 0; i1 < binaryCount; ++i1) {
 		for (int i2 = 0; i2 < binaryCount; ++i2) {
 			float globalSim = 0.0f;
