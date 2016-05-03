@@ -17,13 +17,9 @@ int main (int argc, char* argv[]) {
   const float DELTA = 0.2f;
 	std::cerr << "Loading Data" << std::endl;
   loadData (argv[1]);
-  sim.resize (sizes.size() * sizes.size());
+  sim.resize ((STOP_L1 - START_L1) * (STOP_L2 - START_L2));
 	std::cerr << "Compute Kernel " << std::endl;
-
-	auto begin = std::chrono::high_resolution_clock::now();
-  computeSimilarity(subtrees.data(), subtrees.size(), offsets.data(), sizes.data(), offsets.size(), sim.data(), sim.size(), DELTA);
-	auto end = std::chrono::high_resolution_clock::now();
-	std::cout << "TIME: " << std::chrono::duration_cast<std::chrono::seconds> (end - begin).count() << std::endl;
+  computeSimilarity (subtrees.data(), offsets.data(), sizes.data(), START_L1, STOP_L1, START_L2, STOP_L2, sim.data(), DELTA);
 	std::cout << sim[0] << std::endl;
 	#ifdef OUTPUT
   std::ofstream ofs (argv[2]);
@@ -56,6 +52,8 @@ void loadData (const std::string & fileName) {
 		if (sizes.size() >= LIMIT)
 			break;
   }
+	offsets.push_back (cumulativeIndex);
+	sizes.push_back (0);
 }
 
 float simFunc (const Subtree * restrict s1, const Subtree * restrict s2) {
@@ -66,26 +64,39 @@ float simFunc (const Subtree * restrict s1, const Subtree * restrict s2) {
   return normdiff;
 }
 
-void computeSimilarity (const Subtree * restrict data, const int subtreeCount,
-                        const int * restrict offsets, const int * restrict sizes, const int binaryCount,
-                        float * restrict sim, const int simCount, const float delta) {
+void computeSimilarity (const Subtree * restrict data, const int * restrict offsets, const int * restrict sizes,
+												const int LOOP1_START, const int LOOP1_END, const int LOOP2_START, const int LOOP2_END,
+                        float * restrict sim, const float delta) {
 
-  #pragma omp parallel for collapse(2)
-	for (int i1 = 0; i1 < binaryCount; ++i1) {
-		for (int i2 = 0; i2 < binaryCount; ++i2) {
+	const Subtree* data1 = data + offsets[LOOP1_START];
+	int binSize1 = offsets[LOOP1_END] - offsets[LOOP1_START];
+
+	const Subtree* data2 = data + offsets[LOOP2_START];
+	int binSize2 = offsets[LOOP2_END] - offsets[LOOP2_START];
+
+	const int* offsets1 = offsets + LOOP1_START;
+	const int* sizes1 = sizes + LOOP1_START;
+	int size1 = LOOP1_END - LOOP1_START;
+
+	const int* offsets2 = offsets + LOOP2_END;
+	const int* sizes2 = sizes + LOOP2_START;
+	int size2 = LOOP2_END - LOOP2_START;
+
+  #pragma omp parallel for collapse(2) schedule(dynamic,1)
+	for (int i1 = 0; i1 < size1; ++i1) {
+		for (int i2 = 0; i2 < size2; ++i2) {
 			float globalSim = 0.0f;
-			for (int j1 = 0; j1 < sizes[i1]; ++j1) {
-				for (int j2 = 0; j2 < sizes[i2]; ++j2) {
-					const Subtree* s1 = data + offsets [i1] + j1;
-					const Subtree* s2 = data + offsets [i2] + j2;
+			for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
+				for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
+					const Subtree* s1 = data1 + offsets1 [i1] + j1;
+					const Subtree* s2 = data2 + offsets2 [i2] + j2;
 					float localSim = simFunc (s1, s2);
 					if (localSim > delta) {
 						globalSim += 1.0f;
 					}
 				}
 			}
-			int i = (binaryCount * (binaryCount - 1) / 2) - (binaryCount - i1) * (binaryCount - i1 - 1) / 2 + i2 - i1 - 1;
-			sim [i] = globalSim / fminf (sizes[i1], sizes[i2]);
+			sim [size1 * i2 + i1] = globalSim / fminf (sizes1[i1], sizes2[i2]);
 		}
 	}
 	std::cerr << "> Fin" << std::endl;

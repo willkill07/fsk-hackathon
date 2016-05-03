@@ -2,6 +2,11 @@
 
 #define FV_SIZE 54
 
+#define START_L1 0
+#define STOP_L1 1
+#define START_L2 2
+#define STOP_L2 3
+
 struct Subtree {
   float fv[FV_SIZE];
 };
@@ -12,7 +17,7 @@ std::vector <int> sizes;
 std::vector <float> sim;
 
 void loadData (const std::string &);
-void computeSimilarity (const Subtree * restrict, const int,
-                        const int * restrict, const int * restrict, const int,
-												float * restrict, const int, const float);
+void computeSimilarity (const Subtree * restrict data, const int * restrict offsets, const int * restrict sizes,
+												const int LOOP1_START, const int LOOP1_END, const int LOOP2_START, const int LOOP2_END,
+                        float * restrict sim, const float delta);
 float simFunc (const Subtree * restrict, const Subtree * restrict);
