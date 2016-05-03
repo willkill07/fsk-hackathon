@@ -78,7 +78,7 @@ void computeSimilarity (const Subtree * restrict data, const int * restrict offs
 	const int* sizes1 = sizes + LOOP1_START;
 	int size1 = LOOP1_END - LOOP1_START;
 
-	const int* offsets2 = offsets + LOOP2_END;
+	const int* offsets2 = offsets + LOOP2_START;
 	const int* sizes2 = sizes + LOOP2_START;
 	int size2 = LOOP2_END - LOOP2_START;
 
