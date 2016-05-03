@@ -61,6 +61,7 @@ void loadData (const std::string & fileName) {
 
 float simFunc (const Subtree * restrict s1, const Subtree * restrict s2) {
   float normdiff = 0.0f;
+	#pragma omp simd
   for (int k = 0; k < FV_SIZE; ++k) {
     normdiff += fabsf (s1->fv[k] - s2->fv[k]) / fmaxf (1.0f, fmaxf (s1->fv[k], s2->fv[k]));
   }
@@ -87,20 +88,26 @@ void computeSimilarity (const Subtree * restrict data, const int * restrict offs
 
   #pragma omp parallel for collapse(2) schedule(dynamic,1)
 	for (int i1 = 0; i1 < size1; ++i1) {
-		for (int i2 = 0; i2 < size2; ++i2) {
-			float globalSim = 0.0f;
-			for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
-				for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
-					const Subtree* s1 = data1 + offsets1 [i1] + j1;
-					const Subtree* s2 = data2 + offsets2 [i2] + j2;
-					float localSim = simFunc (s1, s2);
-					if (localSim > delta) {
-						globalSim += 1.0f;
-					}
-				}
-			}
-			sim [size1 * i2 + i1] = globalSim / fminf (sizes1[i1], sizes2[i2]);
-		}
-	}
+    for (int i2 = 0; i2 < size2; ++i2) {
+      float globalSim = 0.0f;
+      const Subtree* base1 = data1 + offsets1 [i1];
+      const Subtree* base2 = data2 + offsets2 [i2];
+      for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
+        float localSim = 1.0f;
+        for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
+          localSim = fminf (localSim, simFunc (base1 + j1, base2 + j2));
+        }
+        globalSim += (localSim < delta);
+      }
+      for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
+        float localSim = 1.0f;
+        for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
+          localSim = fminf (localSim, simFunc (base1 + j1, base2 + j2));
+        }
+        globalSim += (localSim < delta);
+      }
+      sim [size1 * i2 + i1] = 1.0f - globalSim / (sizes1[i1] + sizes2[i2]);
+    }
+  }
 	std::cerr << "> Fin" << std::endl;
 }
