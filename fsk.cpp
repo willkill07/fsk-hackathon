@@ -84,28 +84,26 @@ void computeSimilarity (const Subtree * restrict data, const int * restrict offs
 	int size2 = LOOP2_END - LOOP2_START;
 
 
-#if !(USE_DATA)
-	#pragma acc parallel loop collapse(2) \
-		copyin (data1[0:binSize1],data2[0:binSize2],offsets1[0:size1],offsets2[0:size2],sizes1[0:size1],sizes2[0:size2]), \
-		copyout (sim[0:size1*size2])
+  #if USE_DATA
+		{
+			int begin = std::min(offsets[LOOP1_START], offsets[LOOP2_START]);
+			int end = std::max(offsets[LOOP1_END], offsets[LOOP2_END]);
+			int size = end - begin;
+      #pragma acc enter data copyin(data[begin:size])
+		}
+		{
+			int begin = std::min(LOOP1_START, LOOP2_START);
+			int end = std::max(LOOP1_END, LOOP2_END);
+			int size = end - begin;
+      #pragma acc enter data copyin(offsets[begin:size],sizes[begin:size])
+		}
+    #pragma acc parallel loop collapse(2) \
+			present (data1,data2,offsets1,offsets2,sizes1,sizes2),	\
+			copyout (sim[0:size1*size2])
 	#else
-	#ifdef _OPENACC
-	{
-		int begin = std::min(offsets[LOOP1_START], offsets[LOOP2_START]);
-		int end = std::max(offsets[LOOP1_END], offsets[LOOP2_END]);
-		int size = end - begin;
-    #pragma acc enter data copyin(data[begin:size])
-	}
-	{
-		int begin = std::min(LOOP1_START, LOOP2_START);
-		int end = std::max(LOOP1_END, LOOP2_END);
-		int size = end - begin;
-    #pragma acc enter data copyin(offsets[begin:size],sizes[begin:size])
-	}
-	#endif
-  #pragma acc parallel loop collapse(2) \
-	present (data1,data2,offsets1,offsets2,sizes1,sizes2), \
-	copyout (sim[0:size1*size2])
+  	#pragma acc parallel loop collapse(2) \
+		  copyin (data1[0:binSize1],data2[0:binSize2],offsets1[0:size1],offsets2[0:size2],sizes1[0:size1],sizes2[0:size2]), \
+		  copyout (sim[0:size1*size2])
 	#endif
 	for (int i1 = 0; i1 < size1; ++i1) {
 		for (int i2 = 0; i2 < size2; ++i2) {
@@ -126,7 +124,7 @@ void computeSimilarity (const Subtree * restrict data, const int * restrict offs
 	}
 
 	#if USE_DATA
-  #pragma acc exit data delete(data,offsets,sizes)
+    #pragma acc exit data delete(data,offsets,sizes)
 	#endif
 	std::cerr << "> Fin" << std::endl;
 }

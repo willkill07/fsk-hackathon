@@ -10,9 +10,17 @@ SRC := fsk_cpu.cpp
 
 TARGET := $(SRC:.cpp=)
 
-.PHONY: all clean
+.PHONY: all clean cleanall default
 
-all : $(TARGET)
+default : $(TARGET)
+
+all :
+	make
+	make CPU=1
+
+cleanall :
+	make clean
+	make CPU=1 clean
 
 clean :
 	-rm -rf $(TARGET)

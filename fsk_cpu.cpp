@@ -19,7 +19,10 @@ int main (int argc, char* argv[]) {
   loadData (argv[1]);
   sim.resize ((STOP_L1 - START_L1) * (STOP_L2 - START_L2));
 	std::cerr << "Compute Kernel " << std::endl;
+	auto begin = std::chrono::high_resolution_clock::now();
   computeSimilarity (subtrees.data(), offsets.data(), sizes.data(), START_L1, STOP_L1, START_L2, STOP_L2, sim.data(), DELTA);
+	auto end = std::chrono::high_resolution_clock::now();
+	std::cout << "TIME: " << std::chrono::duration_cast<std::chrono::microseconds> (end - begin).count() << " us" << std::endl;
 	std::cout << sim[0] << std::endl;
 	#ifdef OUTPUT
   std::ofstream ofs (argv[2]);
