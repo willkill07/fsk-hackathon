@@ -56,8 +56,6 @@ void loadData (const std::string & fileName) {
     offsets.push_back (cumulativeIndex);
     cumulativeIndex += currentIndex;
     sizes.push_back (currentIndex);
-    if (sizes.size() >= LIMIT)
-      break;
   }
   offsets.push_back (cumulativeIndex);
   sizes.push_back (0);

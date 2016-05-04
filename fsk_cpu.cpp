@@ -16,18 +16,22 @@
 
 int main (int argc, char* argv[]) {
   const float DELTA = 0.2f;
-	int params[4];
-	std::transform (argv + 3, argv + 7, params, ::atoi);
-  std::cerr << "Loading Data" << std::endl;
+  int params[4];
+  timer start, end;
+  std::transform (argv + 3, argv + 7, params, ::atoi);
+  std::cerr << "Loading Data";
+  start = getTime();
   loadData (argv[1]);
+  end = getTime();
+  fprintf (stderr, "Time (us): %12.2f\n", usTime(start, end));
   sim.resize ((params[1] - params[0]) * (params[3] - params[2]));
-  std::cerr << "Compute Kernel " << std::endl;
-	timer start = getTime();
+  std::cerr << "Compute Kernel ";
+  start = getTime();
   computeSimilarity (subtrees.data(), offsets.data(), sizes.data(), params[0], params[1], params[2], params[3], sim.data(), DELTA);
-	timer end = getTime();
-  printf ("Time (us): %12.2f\n", usTime(start, end));
-	std::copy (sim.begin(), sim.begin() + 5, std::ostream_iterator<float> (std::cout, " "));
-	std::cout << std::endl;
+  end = getTime();
+  fprintf (stderr, "Time (us): %12.2f\n", usTime(start, end));
+  std::copy (sim.begin(), sim.begin() + 5, std::ostream_iterator<float> (std::cout, " "));
+  std::cout << std::endl;
   #ifdef OUTPUT
   std::ofstream ofs (argv[2]);
   std::copy (sim.begin(), sim.end(), std::ostream_iterator<float> (ofs, "\n"));
@@ -56,8 +60,6 @@ void loadData (const std::string & fileName) {
     offsets.push_back (cumulativeIndex);
     cumulativeIndex += currentIndex;
     sizes.push_back (currentIndex);
-    if (sizes.size() >= LIMIT)
-      break;
   }
   offsets.push_back (cumulativeIndex);
   sizes.push_back (0);
@@ -77,10 +79,7 @@ void computeSimilarity (const Subtree * restrict data, const int * restrict offs
                         float * restrict sim, const float delta) {
 
   const Subtree* data1 = data + offsets[LOOP1_START];
-  int binSize1 = offsets[LOOP1_END] - offsets[LOOP1_START];
-
   const Subtree* data2 = data + offsets[LOOP2_START];
-  int binSize2 = offsets[LOOP2_END] - offsets[LOOP2_START];
 
   const int* offsets1 = offsets + LOOP1_START;
   const int* sizes1 = sizes + LOOP1_START;

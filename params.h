@@ -1,5 +1,3 @@
-#define LIMIT 2000
-
 #define FV_SIZE 54
 
 struct Subtree {

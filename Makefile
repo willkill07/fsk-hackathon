@@ -1,7 +1,9 @@
 CXX :=
 CXXFLAGS :=
+COMPILER ?= pgi
 LANGTYPE ?= openacc
 TARGET ?= gpu
+LOADLIBES := -lrt
 HOST := $(shell hostname)
 
 ifeq ($(LANG_TYPE),openacc)
@@ -27,11 +29,6 @@ ifeq ($(COMPILER),pgi)
 # PGI Options
   CXX := pgc++
   CXXFLAGS += -O3 -Minfo=acc,opt,mp
-  ifneq ($(HOST),liz)
-    CXXFLAGS += -tp=bulldozer
-  else
-    CXXFLAGS += -tp=haswell
-  endif
 else
 # Other Compilers
   ifneq ($(HOST),liz)
