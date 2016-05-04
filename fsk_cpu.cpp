@@ -15,14 +15,15 @@
 #include "params.h"
 
 int main (int argc, char* argv[]) {
-
   const float DELTA = 0.2f;
+	int params[4];
+	std::transform (argv + 3, argv + 7, params, ::atoi);
   std::cerr << "Loading Data" << std::endl;
   loadData (argv[1]);
-  sim.resize ((STOP_L1 - START_L1) * (STOP_L2 - START_L2));
+  sim.resize ((params[1] - params[0]) * (params[3] - params[2]));
   std::cerr << "Compute Kernel " << std::endl;
   auto begin = std::chrono::high_resolution_clock::now();
-  computeSimilarity (subtrees.data(), offsets.data(), sizes.data(), START_L1, STOP_L1, START_L2, STOP_L2, sim.data(), DELTA);
+  computeSimilarity (subtrees.data(), offsets.data(), sizes.data(), params[0], params[1], params[2], params[3], sim.data(), DELTA);
   auto end = std::chrono::high_resolution_clock::now();
   std::cout << "TIME: " << std::chrono::duration_cast<std::chrono::microseconds> (end - begin).count() << " us" << std::endl;
   std::cout << sim[0] << std::endl;
@@ -73,21 +74,21 @@ float simFunc (const Subtree * restrict s1, const Subtree * restrict s2) {
 void computeSimilarity (const Subtree * restrict data, const int * restrict offsets, const int * restrict sizes,
                         const int LOOP1_START, const int LOOP1_END, const int LOOP2_START, const int LOOP2_END,
                         float * restrict sim, const float delta) {
-  
+
   const Subtree* data1 = data + offsets[LOOP1_START];
   int binSize1 = offsets[LOOP1_END] - offsets[LOOP1_START];
-  
+
   const Subtree* data2 = data + offsets[LOOP2_START];
   int binSize2 = offsets[LOOP2_END] - offsets[LOOP2_START];
-  
+
   const int* offsets1 = offsets + LOOP1_START;
   const int* sizes1 = sizes + LOOP1_START;
   int size1 = LOOP1_END - LOOP1_START;
-  
+
   const int* offsets2 = offsets + LOOP2_START;
   const int* sizes2 = sizes + LOOP2_START;
   int size2 = LOOP2_END - LOOP2_START;
-  
+
   #pragma omp parallel for collapse(2) schedule(dynamic,1)
   for (int i1 = 0; i1 < size1; ++i1) {
     for (int i2 = 0; i2 < size2; ++i2) {

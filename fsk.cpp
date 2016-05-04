@@ -13,13 +13,14 @@
 #include "params.h"
 
 int main (int argc, char* argv[]) {
-
   const float DELTA = 0.2f;
+	int params[4];
+	std::transform (argv + 3, argv + 7, params, ::atoi);
   std::cerr << "Loading Data" << std::endl;
   loadData (argv[1]);
-  sim.resize ((STOP_L1 - START_L1) * (STOP_L2 - START_L2));
+  sim.resize ((params[1] - params[0]) * (params[3] - params[2]));
   std::cerr << "Compute Kernel " << std::endl;
-  computeSimilarity (subtrees.data(), offsets.data(), sizes.data(), START_L1, STOP_L1, START_L2, STOP_L2, sim.data(), DELTA);
+  computeSimilarity (subtrees.data(), offsets.data(), sizes.data(), params[0], params[1], params[2], params[3], sim.data(), DELTA);
   std::cout << sim[0] << std::endl;
   #ifdef OUTPUT
   std::ofstream ofs (argv[2]);
@@ -56,7 +57,7 @@ void loadData (const std::string & fileName) {
   sizes.push_back (0);
 }
 
-#pragma acc routine 
+#pragma acc routine
 float simFunc (const Subtree * const restrict s1, const Subtree * const restrict s2) {
   float normdiff = 0.0f;
   for (int k = 0; k < FV_SIZE; ++k) {

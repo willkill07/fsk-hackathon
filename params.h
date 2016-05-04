@@ -2,11 +2,6 @@
 
 #define FV_SIZE 54
 
-#define START_L1 0
-#define STOP_L1 100
-#define START_L2 0
-#define STOP_L2 100
-
 struct Subtree {
   float fv[FV_SIZE];
 };
