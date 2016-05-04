@@ -7,10 +7,12 @@
 #include <vector>
 
 #include <cmath>
+#include <cstdio>
 
 #include <openacc.h>
 
 #include "params.h"
+#include "timer.h"
 
 int main (int argc, char* argv[]) {
   const float DELTA = 0.2f;
@@ -20,8 +22,12 @@ int main (int argc, char* argv[]) {
   loadData (argv[1]);
   sim.resize ((params[1] - params[0]) * (params[3] - params[2]));
   std::cerr << "Compute Kernel " << std::endl;
+	timer start = getTime();
   computeSimilarity (subtrees.data(), offsets.data(), sizes.data(), params[0], params[1], params[2], params[3], sim.data(), DELTA);
-  std::cout << sim[0] << std::endl;
+	timer end = getTime();
+	printf ("Time (us): %12.2f\n", usTime(start, end));
+	std::copy (sim.begin(), sim.begin() + 5, std::ostream_iterator<float> (std::cout, " "));
+	std::cout << std::endl;
   #ifdef OUTPUT
   std::ofstream ofs (argv[2]);
   std::copy (sim.begin(), sim.end(), std::ostream_iterator<float> (ofs, "\n"));
@@ -110,5 +116,4 @@ void computeSimilarity (const Subtree * const restrict data, const int * const r
       sim [size1 * i2 + i1] = 1.0f - globalSim / (sizes1[i1] + sizes2[i2]);
     }
   }
-  std::cerr << "> Fin" << std::endl;
 }

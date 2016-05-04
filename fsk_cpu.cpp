@@ -6,13 +6,13 @@
 #include <string>
 #include <vector>
 
-#include <chrono>
-
 #include <cmath>
+#include <cstdio>
 
 #define restrict __restrict__
 
 #include "params.h"
+#include "timer.h"
 
 int main (int argc, char* argv[]) {
   const float DELTA = 0.2f;
@@ -22,16 +22,17 @@ int main (int argc, char* argv[]) {
   loadData (argv[1]);
   sim.resize ((params[1] - params[0]) * (params[3] - params[2]));
   std::cerr << "Compute Kernel " << std::endl;
-  auto begin = std::chrono::high_resolution_clock::now();
+	timer start = getTime();
   computeSimilarity (subtrees.data(), offsets.data(), sizes.data(), params[0], params[1], params[2], params[3], sim.data(), DELTA);
-  auto end = std::chrono::high_resolution_clock::now();
-  std::cout << "TIME: " << std::chrono::duration_cast<std::chrono::microseconds> (end - begin).count() << " us" << std::endl;
-  std::cout << sim[0] << std::endl;
-#ifdef OUTPUT
+	timer end = getTime();
+  printf ("Time (us): %12.2f\n", usTime(start, end));
+	std::copy (sim.begin(), sim.begin() + 5, std::ostream_iterator<float> (std::cout, " "));
+	std::cout << std::endl;
+  #ifdef OUTPUT
   std::ofstream ofs (argv[2]);
   std::copy (sim.begin(), sim.end(), std::ostream_iterator<float> (ofs, "\n"));
   ofs.close();
-#endif
+  #endif
   return 0;
 }
 
@@ -112,5 +113,4 @@ void computeSimilarity (const Subtree * restrict data, const int * restrict offs
       sim [size1 * i2 + i1] = 1.0f - globalSim / (sizes1[i1] + sizes2[i2]);
     }
   }
-  std::cerr << "> Fin" << std::endl;
 }
