@@ -56,57 +56,55 @@ void loadData (const std::string & fileName) {
   sizes.push_back (0);
 }
 
-#pragma acc routine seq
-float simFunc (const Subtree * restrict s1, const Subtree * restrict s2) {
+#pragma acc routine 
+float simFunc (const Subtree * const restrict s1, const Subtree * const restrict s2) {
   float normdiff = 0.0f;
   for (int k = 0; k < FV_SIZE; ++k) {
-    normdiff += fabsf (s1->fv[k] - s2->fv[k]) / fmaxf (1.0f, fmaxf (s1->fv[k], s2->fv[k]));
+    normdiff += fabsf (s1->fv[k] - s2->fv[k]) / fmaxf (1.0f, fminf (s1->fv[k], s2->fv[k]));
   }
   return normdiff / FV_SIZE;
 }
 
-void computeSimilarity (const Subtree * restrict data, const int * restrict offsets, const int * restrict sizes,
+void computeSimilarity (const Subtree * const restrict data, const int * const restrict offsets, const int * const restrict sizes,
                         const int LOOP1_START, const int LOOP1_END, const int LOOP2_START, const int LOOP2_END,
                         float * restrict sim, const float delta) {
 
-  const Subtree* data1 = data + offsets[LOOP1_START];
+  const Subtree* const data1 = data + offsets[LOOP1_START];
   int binSize1 = offsets[LOOP1_END] - offsets[LOOP1_START];
 
-  const Subtree* data2 = data + offsets[LOOP2_START];
+  const Subtree* const data2 = data + offsets[LOOP2_START];
   int binSize2 = offsets[LOOP2_END] - offsets[LOOP2_START];
 
-  const int* offsets1 = offsets + LOOP1_START;
-  const int* sizes1 = sizes + LOOP1_START;
+  const int* const offsets1 = offsets + LOOP1_START;
+  const int* const sizes1 = sizes + LOOP1_START;
   int size1 = LOOP1_END - LOOP1_START;
 
-  const int* offsets2 = offsets + LOOP2_START;
-  const int* sizes2 = sizes + LOOP2_START;
+  const int* const offsets2 = offsets + LOOP2_START;
+  const int* const sizes2 = sizes + LOOP2_START;
   int size2 = LOOP2_END - LOOP2_START;
 
-  #pragma acc parallel loop collapse(2) \
+  #pragma acc parallel loop gang collapse(2), \
     copyin (data1[0:binSize1], data2[0:binSize2], offsets1[0:size1], \
             offsets2[0:size2], sizes1[0:size1], sizes2[0:size2]), \
     copyout (sim[0:size1*size2])
   for (int i1 = 0; i1 < size1; ++i1) {
     for (int i2 = 0; i2 < size2; ++i2) {
       float globalSim = 0.0f;
-      const Subtree* base1 = data1 + offsets1 [i1];
-      const Subtree* base2 = data2 + offsets2 [i2];
       #pragma acc loop vector
       for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
-        float localSim = 1.0f;
+        float localSim12 = 1.0f;
         for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
-          localSim = fminf (localSim, simFunc (base1 + j1, base2 + j2));
+          localSim12 = fminf (localSim12, simFunc (data1 + offsets1 [i1] + j1, data2 + offsets1 [i2] + j2));
         }
-        globalSim += (localSim < delta);
+        globalSim += (localSim12 < delta);
       }
       #pragma acc loop vector
       for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
-        float localSim = 1.0f;
+        float localSim21 = 1.0f;
         for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
-          localSim = fminf (localSim, simFunc (base1 + j1, base2 + j2));
+          localSim21 = fminf (localSim21, simFunc (data1 + offsets1 [i1] + j1, data2 + offsets1 [i2] + j2));
         }
-        globalSim += (localSim < delta);
+        globalSim += (localSim21 < delta);
       }
       sim [size1 * i2 + i1] = 1.0f - globalSim / (sizes1[i1] + sizes2[i2]);
     }
