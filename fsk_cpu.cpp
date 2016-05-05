@@ -15,7 +15,7 @@
 #include "timer.h"
 
 int main (int argc, char* argv[]) {
-  const float DELTA = 0.2f;
+  const float DELTA = 0.35f;
   int params[4];
   timer start, end;
   std::transform (argv + 3, argv + 7, params, ::atoi);

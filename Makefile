@@ -1,6 +1,5 @@
 CXX :=
 CXXFLAGS :=
-COMPILER ?= pgi
 LANGTYPE ?= openacc
 TARGET ?= gpu
 LOADLIBES := -lrt
