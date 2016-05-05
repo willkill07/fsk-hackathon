@@ -16,23 +16,23 @@
 
 int main (int argc, char* argv[]) {
   const float DELTA = 0.2f;
-	int params[4];
-	std::transform (argv + 3, argv + 7, params, ::atoi);
+  int params[4];
+  std::transform (argv + 3, argv + 7, params, ::atoi);
   std::cerr << "Loading Data" << std::endl;
   loadData (argv[1]);
   sim.resize ((params[1] - params[0]) * (params[3] - params[2]));
   std::cerr << "Compute Kernel " << std::endl;
-	timer start = getTime();
+  timer start = getTime();
   computeSimilarity (subtrees.data(), offsets.data(), sizes.data(), params[0], params[1], params[2], params[3], sim.data(), DELTA);
-	timer end = getTime();
-	printf ("Time (us): %12.2f\n", usTime(start, end));
-	std::copy (sim.begin(), sim.begin() + 5, std::ostream_iterator<float> (std::cout, " "));
-	std::cout << std::endl;
-  #ifdef OUTPUT
+  timer end = getTime();
+  printf ("Time (us): %12.2f\n", usTime(start, end));
+  std::copy (sim.begin(), sim.begin() + 5, std::ostream_iterator<float> (std::cout, " "));
+  std::cout << std::endl;
+#ifdef OUTPUT
   std::ofstream ofs (argv[2]);
   std::copy (sim.begin(), sim.end(), std::ostream_iterator<float> (ofs, "\n"));
   ofs.close();
-  #endif
+#endif
   return 0;
 }
 
@@ -88,30 +88,46 @@ void computeSimilarity (const Subtree * const restrict data, const int * const r
   const int* const sizes2 = sizes + LOOP2_START;
   int size2 = LOOP2_END - LOOP2_START;
 
-  #pragma acc parallel loop gang collapse(2), \
-    copyin (data1[0:binSize1], data2[0:binSize2], offsets1[0:size1], \
-            offsets2[0:size2], sizes1[0:size1], sizes2[0:size2]), \
+  #pragma acc data copyin (data1[0:binSize1], data2[0:binSize2], offsets1[0:size1], \
+			   offsets2[0:size2], sizes1[0:size1], sizes2[0:size2]), \
     copyout (sim[0:size1*size2])
-  for (int i1 = 0; i1 < size1; ++i1) {
+  {
+    #pragma acc parallel loop gang collapse(2) async(0)
+    for (int i1 = 0; i1 < size1; ++i1) {
+      for (int i2 = 0; i2 < size2; ++i2) {
+	#pragma acc loop worker
+	for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
+	  float localSim = 1.0f;
+	  #pragma acc loop vector
+	  for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
+	    localSim = fminf (localSim, simFunc (data1 + offsets1 [i1] + j1, data2 + offsets1 [i2] + j2));
+	  }
+	  #pragma acc atomic
+	  sim [size1 * i2 + i1] += (localSim < delta);
+	}
+      }
+    }
+    #pragma acc parallel loop gang collapse(2) async(0)
     for (int i2 = 0; i2 < size2; ++i2) {
-      float globalSim = 0.0f;
-      #pragma acc loop vector
-      for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
-        float localSim12 = 1.0f;
-        for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
-          localSim12 = fminf (localSim12, simFunc (data1 + offsets1 [i1] + j1, data2 + offsets1 [i2] + j2));
-        }
-        globalSim += (localSim12 < delta);
+      for (int i1 = 0; i1 < size1; ++i1) {
+	#pragma acc loop worker
+	for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
+	  float localSim = 1.0f;
+	  #pragma acc loop vector
+	  for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
+	    localSim = fminf (localSim, simFunc (data1 + offsets1 [i1] + j1, data2 + offsets1 [i2] + j2));
+	  }
+	  #pragma acc atomic
+	  sim [size1 * i2 + i1] += (localSim < delta);
+	}
       }
-      #pragma acc loop vector
-      for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
-        float localSim21 = 1.0f;
-        for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
-          localSim21 = fminf (localSim21, simFunc (data1 + offsets1 [i1] + j1, data2 + offsets1 [i2] + j2));
-        }
-        globalSim += (localSim21 < delta);
+    }
+    #pragma acc wait
+    #pragma acc parallel loop gang worker vector collapse(2)
+    for (int i2 = 0; i2 < size2; ++i2) {
+      for (int i1 = 0; i1 < size1; ++i1) {
+	sim [size1 * i2 + i1] = 1.0f - sim[size1 * i2 + i1] / (sizes[i1] + sizes[i2]);
       }
-      sim [size1 * i2 + i1] = 1.0f - globalSim / (sizes1[i1] + sizes2[i2]);
     }
   }
 }
