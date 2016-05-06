@@ -9,7 +9,9 @@
 #include <cmath>
 #include <cstdio>
 
+#ifdef _OPENACC
 #include <openacc.h>
+#endif
 
 #include "params.h"
 #include "timer.h"
@@ -62,11 +64,10 @@ void loadData (const std::string & fileName) {
 }
 
 #pragma acc routine
-float simFunc (const Subtree * const restrict s1, const Subtree * const restrict s2) {
+float simFunc (const float * const restrict s1, const float * const restrict s2) {
   float normdiff = 0.0f;
-  #pragma acc loop independent
   for (int k = 0; k < FV_SIZE; ++k) {
-    normdiff += fabsf (s1->fv[k] - s2->fv[k]) / fmaxf (1.0f, fminf (s1->fv[k], s2->fv[k]));
+    normdiff += fabsf (s1[k] - s2[k]) / fmaxf (1.0f, fminf (s1[k], s2[k]));
   }
   return normdiff / FV_SIZE;
 }
@@ -86,58 +87,29 @@ void computeSimilarity (const Subtree * const restrict data, const int * const r
   int size1 = LOOP1_END - LOOP1_START;
   int size2 = LOOP2_END - LOOP2_START;
 
-  #pragma acc data copyin (data1[0:binSize1], data2[0:binSize2], offsets1[0:size1], \
-                           offsets2[0:size2], sizes1[0:size1], sizes2[0:size2]), \
-    copyout (sim[0:size1*size2])
-  {
-    #pragma acc kernels loop independent async(0)
-    for (int i = 0; i < size1 * size2; ++i) {
-      sim[i] = 0.0f;
-    }
-    #pragma acc kernels loop independent async(0)
-    for (int i1 = 0; i1 < size1; ++i1) {
-      #pragma acc loop independent
-      for (int i2 = 0; i2 < size2; ++i2) {
-        float globalSim = 0.0f;
-        #pragma acc loop independent
-        for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
-          float localSim = 1.0f;
-          #pragma acc loop independent
-          for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
-            localSim = fminf (localSim, simFunc (data1 + offsets1 [i1] + j1, data2 + offsets2 [i2] + j2));
-          }
-          globalSim += (localSim < delta);
-        }
-        #pragma acc atomic update
-        sim [size1 * i2 + i1] += globalSim;
-      }
-    }
-    #pragma acc kernels loop independent async(0)
+  #pragma acc parallel copyin (data1[0:binSize1], data2[0:binSize2], offsets1[0:size1], \
+                               offsets2[0:size2], sizes1[0:size1], sizes2[0:size2]), \
+    copyout (sim[0:size1*size2]) loop collapse(2) gang
+  for (int i1 = 0; i1 < size1; ++i1) {
     for (int i2 = 0; i2 < size2; ++i2) {
-      #pragma acc loop independent
-      for (int i1 = 0; i1 < size1; ++i1) {
-        float globalSim = 0.0f;
-        #pragma acc loop independent
+      float globalSim = 0.0f;
+      #pragma acc loop vector
+      for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
+        float localSim = 1.0f;
         for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
-          float localSim = 1.0f;
-          #pragma acc loop independent
-          for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
-            localSim = fminf (localSim, simFunc (data1 + offsets1 [i1] + j1, data2 + offsets2 [i2] + j2));
-          }
-          globalSim += (localSim < delta);
+          localSim = fminf (localSim, simFunc (data1 [offsets1 [i1] + j1].fv, data2 [offsets2 [i2] + j2].fv));
         }
-        #pragma acc atomic update
-        sim [size1 * i2 + i1] += globalSim;
+        globalSim += (localSim < delta);
       }
-    }
-    #pragma acc kernels loop independent async(0)
-    for (int i2 = 0; i2 < size2; ++i2) {
-      #pragma acc loop independent
-      for (int i1 = 0; i1 < size1; ++i1) {
-        int i = size1 * i2 + i1;
-        sim[i] = 1.0f - sim[i] / (sizes1[i1] + sizes2[i2]);
+      #pragma acc loop vector
+      for (int j2 = 0; j2 < sizes2 [i2]; ++j2) {
+        float localSim = 1.0f;
+        for (int j1 = 0; j1 < sizes1 [i1]; ++j1) {
+          localSim = fminf (localSim, simFunc (data1 [offsets1 [i1] + j1].fv, data2 [offsets2 [i2] + j2].fv));
+        }
+        globalSim += (localSim < delta);
       }
+      sim[size1 * i2 + i1] = 1.0f - globalSim / (sizes1[i1] + sizes2[i2]);
     }
-    #pragma acc wait (0)
   }
 }

@@ -5,6 +5,8 @@ TARGET ?= gpu
 LOADLIBES := -lrt
 HOST := $(shell hostname)
 
+#TAU := tau
+
 ifeq ($(LANG_TYPE),openacc)
 # OpenACC Setup
   COMPILER := pgi
@@ -14,9 +16,9 @@ ifeq ($(LANG_TYPE),openacc)
     CXXFLAGS += -ta=multicore
   else
     ifeq ($(HOST),liz)
-      CXXFLAGS += -ta=nvidia,cc50,7.5
+      CXXFLAGS += -ta=nvidia:managed,maxwell,cuda7.5,keepptx,ptxinfo,maxregcount:32
     else
-      CXXFLAGS += -ta=nvidia,cc35,7.0
+      CXXFLAGS += -ta=nvidia,kepler,cuda7.0,keepptx,ptxinfo,maxregcount:32
     endif
   endif
 else
@@ -26,7 +28,7 @@ endif
 
 ifeq ($(COMPILER),pgi)
 # PGI Options
-  CXX := pgc++
+  CXX := $(TAU) pgc++
   CXXFLAGS += -O3 -Minfo=acc,opt,mp
 else
 # Other Compilers
@@ -34,7 +36,7 @@ else
     CXX := g++
     CXXFLAGS += -march=native -O3 -fopenmp
   else
-    CXX := icpc
+    CXX := $(TAU) icpc
     CXXFLAGS += -xHOST -O3 -openmp
   endif
 endif
