@@ -12,6 +12,9 @@
 #ifdef _OPENACC
 #include <openacc.h>
 #endif
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "params.h"
 #include "timer.h"
